@@ -6,6 +6,9 @@ import java.awt.image.BufferedImage;
 /** The window content: runs the loop, draws the 3D image and the HUD, captures the mouse. */
 public class GamePanel extends JPanel {
     private Game game;
+    private final MenuScreen menu = new MenuScreen();
+    private volatile Game pending;
+    private boolean loadingStarted;
     private final Input input;
     private final Renderer renderer = new Renderer();
     private final Hud hud = new Hud();
@@ -15,7 +18,7 @@ public class GamePanel extends JPanel {
     private boolean captured;
 
     public GamePanel(Game game, Input input) {
-        this.game = game;
+        this.game = null;
         this.input = input;
         setPreferredSize(new Dimension(1280, 720));
         setBackground(Color.BLACK);
@@ -23,11 +26,16 @@ public class GamePanel extends JPanel {
         setFocusTraversalKeysEnabled(false);
         addKeyListener(input);
         addMouseWheelListener(input);
+        addKeyListener(new KeyAdapter() { @Override public void keyTyped(KeyEvent e) { menu.typed(e.getKeyChar()); } });
         try { robot = new Robot(); } catch (AWTException | SecurityException e) { robot = null; }
         blank = Toolkit.getDefaultToolkit().createCustomCursor(
                 new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB), new Point(0, 0), "blank");
         addMouseListener(new MouseAdapter() {
-            @Override public void mousePressed(MouseEvent e) { requestFocusInWindow(); captured = true; input.setClick(); }
+            @Override public void mousePressed(MouseEvent e) {
+                requestFocusInWindow();
+                if (GamePanel.this.game == null) { menu.click(e.getX(), e.getY(), getWidth(), getHeight()); return; }
+                captured = true; input.setClick();
+            }
         });
         addFocusListener(new FocusAdapter() {
             @Override public void focusLost(FocusEvent e) { captured = false; setCursor(Cursor.getDefaultCursor()); }
@@ -40,10 +48,25 @@ public class GamePanel extends JPanel {
         double dt = Math.min(0.05, (now - last) / 1e9);
         last = now;
 
+        if (game == null) {                         // title / character / loading screens
+            menu.key(input, dt);
+            if (menu.phase() == MenuScreen.Phase.CREATE && menu.wantsStart()) {
+                menu.beginLoading();
+                CharacterProfile prof = menu.profile();
+                Thread th = new Thread(() -> pending = new Game(input, prof), "loader");
+                th.setDaemon(true); th.start();
+            } else if (menu.phase() == MenuScreen.Phase.LOADING) {
+                menu.tickLoading(dt);
+                if (menu.loadingDone(pending != null)) { game = pending; input.clearEdges(); captured = false; }
+            }
+            repaint();
+            return;
+        }
+
         if (game.state() == Game.State.DEAD || game.state() == Game.State.WON) {
             if (input.pressed(KeyEvent.VK_ENTER)) {
                 game.shutdown();
-                game = new Game(input);
+                game = new Game(input, game.profile());
                 input.clearEdges();
             }
         }
@@ -68,6 +91,7 @@ public class GamePanel extends JPanel {
     protected void paintComponent(Graphics g0) {
         super.paintComponent(g0);
         Graphics2D g = (Graphics2D) g0;
+        if (game == null) { menu.draw(g, getWidth(), getHeight()); return; }
         renderer.render(game, game.time());
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g.drawImage(renderer.getImage(), 0, 0, getWidth(), getHeight(), null);

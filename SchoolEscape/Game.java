@@ -25,8 +25,15 @@ public class Game {
     private int stage;
     private int menuSel;
 
-    public Game(Input input) {
+    private final CharacterProfile profile;
+
+    public Game(Input input) { this(input, new CharacterProfile()); }
+
+    public CharacterProfile profile() { return profile; }
+
+    public Game(Input input, CharacterProfile profile) {
         this.input = input;
+        this.profile = profile;
         Textures.init();
         world = World.build();
         player = new Player(5.5, 21.5, 0);
@@ -35,7 +42,7 @@ public class Game {
         objects.addAll(world.initialObjects());
         states.push(State.PLAYING);
         sound.startAmbient();
-        say("Dirk: Everyone is gone... I need to find a way out.");
+        say(profile.getName() + ": Everyone is gone... I need to find a way out.");
     }
 
     /* ------------------------------------------------------------ getters */
@@ -56,7 +63,7 @@ public class Game {
     public Input input() { return input; }
 
     /* ------------------------------------------------------------ services for objects */
-    public void say(String s) { thoughts.enqueue(s); }
+    public void say(String s) { thoughts.enqueue(s.startsWith("Dirk:") ? profile.getName() + s.substring(4) : s); }
     public void sfx(String n) { sound.play(n); }
     public void addObject(GameObject o) { toAdd.add(o); }
     public void removeObject(GameObject o) { toRemove.add(o); }

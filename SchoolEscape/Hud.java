@@ -30,7 +30,7 @@ public class Hud {
         AffineTransform base = g.getTransform();
         g.scale(s, s);
         int vh = (int) (h / s);
-        statusPanel(g, p);
+        statusPanel(g, p, game.profile());
         objectivePanel(g, game, 1672);
         minimap(g, game, 1672);
         keyLegend(g, vh);
@@ -41,22 +41,53 @@ public class Hud {
         overlay(g, game, w, h, s);
     }
 
+    /** Draws the 80x84 character bust used for the HUD portrait and the menus. */
+    public static void drawBust(Graphics2D g, CharacterProfile c, double t) {
+        g.setColor(new Color(30, 34, 44)); g.fillRoundRect(0, 0, 80, 84, 8, 8);
+        Shape clip = g.getClip();
+        g.clip(new RoundRectangle2D.Double(0, 0, 80, 84, 8, 8));
+        Color hair = c.hairColor(), skin = c.skinColor();
+        if (c.getStyle() == 1) { g.setColor(hair); g.fillRoundRect(16, 22, 48, 60, 24, 24); }          // long hair back
+        g.setColor(c.shirtColor()); g.fillRoundRect(8, 62, 64, 30, 22, 22);                             // shirt
+        g.setColor(skin.darker()); g.fillRect(34, 56, 12, 12);                                          // neck
+        g.setColor(skin); g.fillOval(22, 24, 36, 42);                                                   // face
+        g.setColor(hair);
+        switch (c.getStyle()) {
+            case 0: g.fillArc(20, 18, 40, 34, 0, 180); break;
+            case 1: g.fillArc(20, 18, 40, 34, 0, 180); g.fillRect(20, 34, 5, 28); g.fillRect(55, 34, 5, 28); break;
+            case 2: g.fillArc(20, 20, 40, 30, 0, 180);
+                    g.fillPolygon(new int[]{22, 28, 34}, new int[]{34, 10, 30}, 3);
+                    g.fillPolygon(new int[]{34, 40, 46}, new int[]{30, 6, 30}, 3);
+                    g.fillPolygon(new int[]{46, 52, 58}, new int[]{30, 10, 34}, 3); break;
+            default: g.setColor(new Color(170, 30, 36)); g.fillArc(20, 16, 40, 36, 0, 180); g.fillRect(18, 34, 46, 5);
+                    g.setColor(hair); g.fillRect(22, 38, 36, 3); break;
+        }
+        boolean blink = ((int) (t * 1.0)) % 5 == 4 && (t * 10) % 1 < 0.5;
+        g.setColor(new Color(24, 18, 18));
+        if (blink) { g.fillRect(30, 45, 7, 2); g.fillRect(43, 45, 7, 2); }
+        else { g.fillOval(31, 42, 6, 6); g.fillOval(43, 42, 6, 6); }
+        g.setColor(new Color(150, 80, 70)); g.fillRoundRect(35, 56, 10, 3, 3, 3);                       // mouth
+        if (c.hasGlasses()) {
+            g.setColor(new Color(15, 15, 20)); g.setStroke(new BasicStroke(1.6f));
+            g.drawOval(28, 39, 12, 12); g.drawOval(41, 39, 12, 12); g.drawLine(40, 45, 41, 45);
+        }
+        g.setClip(clip);
+        g.setColor(new Color(220, 220, 230, 160)); g.setStroke(new BasicStroke(1.5f)); g.drawRoundRect(0, 0, 80, 84, 8, 8);
+    }
+
     /* ----------------------------------------------------------- pieces */
     private void box(Graphics2D g, int x, int y, int w, int h) {
         g.setColor(PANEL); g.fillRoundRect(x, y, w, h, 12, 12);
         g.setColor(EDGE); g.setStroke(new BasicStroke(1.5f)); g.drawRoundRect(x, y, w, h, 12, 12);
     }
 
-    private void statusPanel(Graphics2D g, Player p) {
+    private void statusPanel(Graphics2D g, Player p, CharacterProfile profile) {
         box(g, 24, 22, 340, 104);
-        // portrait
-        g.setColor(new Color(30, 34, 44)); g.fillRoundRect(34, 32, 80, 84, 8, 8);
-        g.setColor(new Color(220, 220, 230, 160)); g.drawRoundRect(34, 32, 80, 84, 8, 8);
-        g.setColor(new Color(60, 90, 140)); g.fillRoundRect(42, 92, 64, 24, 14, 14);          // shirt
-        g.setColor(new Color(224, 188, 160)); g.fillOval(56, 60, 36, 40);                       // face
-        g.setColor(new Color(40, 26, 20)); g.fillArc(54, 54, 40, 34, 0, 180);                   // hair
-        g.setColor(new Color(30, 20, 20)); g.fillOval(64, 78, 4, 4); g.fillOval(80, 78, 4, 4);
-        g.setColor(Color.WHITE); g.setFont(b22); g.drawString("Dirk", 128, 56);
+        AffineTransform ps = g.getTransform();
+        g.translate(34, 32);
+        drawBust(g, profile, 0);
+        g.setTransform(ps);
+        g.setColor(Color.WHITE); g.setFont(b22); g.drawString(profile.getName(), 128, 56);
         g.setFont(f12); g.setColor(new Color(220, 225, 235)); g.drawString("Lv. " + p.getLevel(), 128, 76);
         g.drawString("HP: " + p.getHp() + " / " + p.getMaxHp(), 128, 98);
         bar(g, 128, 104, 224, 11, p.getHp() / (double) p.getMaxHp(), RED);
@@ -219,7 +250,7 @@ public class Hud {
         // forearm
         g.setPaint(new GradientPaint(0, 0, new Color(55, 40, 34), 120, 0, new Color(30, 22, 20)));
         g.fill(new RoundRectangle2D.Double(-70, 40, 190, 260, 60, 60));
-        g.setColor(new Color(24, 36, 70)); g.fill(new RoundRectangle2D.Double(-78, 150, 205, 190, 40, 40)); // sleeve
+        g.setColor(game.profile().shirtColor().darker()); g.fill(new RoundRectangle2D.Double(-78, 150, 205, 190, 40, 40)); // sleeve
         // body of the flashlight
         g.setPaint(new GradientPaint(-40, 0, new Color(10, 10, 12), 40, 0, new Color(58, 58, 64)));
         g.fill(new RoundRectangle2D.Double(-34, -170, 72, 260, 24, 24));
@@ -230,7 +261,7 @@ public class Hud {
         g.fill(new Ellipse2D.Double(-42, -222, 88, 22));
         g.setColor(new Color(255, 255, 255, 28)); g.fill(new RoundRectangle2D.Double(-26, -150, 14, 220, 8, 8));
         // fingers
-        g.setPaint(new GradientPaint(0, 0, new Color(196, 150, 124), 0, 90, new Color(130, 92, 76)));
+        g.setPaint(new GradientPaint(0, 0, game.profile().skinColor(), 0, 90, game.profile().skinColor().darker().darker()));
         for (int i = 0; i < 4; i++) g.fill(new RoundRectangle2D.Double(-46 + i * 2, -90 + i * 36, 100, 32, 28, 28));
         g.fill(new RoundRectangle2D.Double(-70, 10, 50, 100, 30, 30));                              // thumb
         g.setTransform(t0);
@@ -250,7 +281,7 @@ public class Hud {
             case DEAD: center(g, "YOU DIED", h / 3, new Color(210, 40, 40));
                 small(g, "Press Enter to try again", h / 3 + (int) (50 * s), s); break;
             case WON: center(g, "YOU ESCAPED!", h / 3, new Color(255, 225, 120));
-                small(g, "Dirk made it out of the school. Press Enter to play again.", h / 3 + (int) (50 * s), s); break;
+                small(g, game.profile().getName() + " made it out of the school. Press Enter to play again.", h / 3 + (int) (50 * s), s); break;
             case INVENTORY: {
                 center(g, "INVENTORY", (int) (h * 0.22), Color.WHITE);
                 int y = (int) (h * 0.30);
