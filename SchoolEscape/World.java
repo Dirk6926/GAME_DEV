@@ -83,9 +83,12 @@ public class World {
         for (int y = 0; y < H; y++) for (int x = 0; x < W; x++) { w.tiles[y][x] = Tile.WALL; w.floor[y][x] = 2; }
 
         // hallways
-        w.carve(4, 20, 55, 22, 0);          // main east-west hall
-        w.carve(28, 4, 30, 19, 0);          // north hall
-        w.carve(28, 23, 30, 37, 0);         // south hall
+        w.carve(7, 6, 33, 8, 0);     // top hall
+        w.carve(7, 15, 33, 17, 0);   // bottom hall
+        w.carve(7, 1, 8, 8, 0);      // left hall, north part
+        w.carve(7, 6, 10, 17, 0);    // left hall
+        w.carve(30, 1, 33, 17, 0);   // right hall
+        w.carve(32, 18, 33, 22, 0);  // right hall, south part
 
         // chained emergency exits at the ends of the halls
         w.tiles[21][3] = Tile.EXIT; w.tiles[21][56] = Tile.EXIT; w.tiles[38][29] = Tile.EXIT;
@@ -94,24 +97,26 @@ public class World {
         w.initial.add(new ChainedExit(29.5, 37.0));
 
         String locked = "Dirk: Locked. I need the right key.";
-        // north classrooms (doors in the wall y=19)
-        w.room(5, 12, 11, 18, 1, "101", 8, 19, null, null, Light.Mode.OFF);
-        w.room(13, 12, 19, 18, 1, "102", 16, 19, null, null, Light.Mode.OFF);
-        w.room(21, 12, 26, 18, 1, "103", 23, 19, null, null, Light.Mode.FLICKER);
-        w.room(32, 12, 38, 18, 1, "104", 35, 19, null, null, Light.Mode.OFF);
-        w.room(40, 12, 46, 18, 1, "105", 43, 19, null, null, Light.Mode.OFF);
-        w.room(48, 12, 54, 18, 1, "106", 51, 19, null, null, Light.Mode.OFF);
-        // south rooms (doors in the wall y=23)
-        w.room(5, 24, 11, 30, 1, "107", 8, 23, null, null, Light.Mode.OFF);
-        w.room(13, 24, 19, 30, 1, "LIBRARY", 16, 23, null, null, Light.Mode.OFF);
-        w.room(21, 24, 26, 30, 1, "CLINIC", 23, 23, null, null, Light.Mode.ON);
-        w.room(32, 24, 46, 30, 1, "CAFETERIA", 39, 23, null, null, Light.Mode.OFF);
-        w.room(48, 24, 54, 30, 2, "JANITOR", 51, 23, null, null, Light.Mode.OFF);
-        // south hall rooms
-        w.room(20, 31, 26, 36, 1, "STAFF", 27, 33, "staff",
-                "Dirk: The staff room is locked. Maybe a teacher left the key in a classroom.", Light.Mode.OFF);
-        w.room(32, 31, 38, 36, 2, "STORAGE", 31, 33, null, null, Light.Mode.OFF);
-        // Room 404: the way out
+        // top row (doors in wall y=5)
+        w.room(10,1,17,4, 1,"BIO LAB",13,5, null,null, Light.Mode.OFF);
+        w.room(19,1,22,4, 1,"410",20,5, null,null, Light.Mode.OFF);
+        w.room(24,1,32,4, 1,"409",26,5, null,null, Light.Mode.OFF);
+        // bottom row (doors in wall y=18)
+        w.room(8,19,12,22,  1,"403",10,18, null,null, Light.Mode.OFF);
+        w.room(14,19,18,22, 1,"404",16,18, "404",null, Light.Mode.ON);
+        w.room(20,19,24,22, 1,"405",22,18, null,null, Light.Mode.OFF);
+        w.room(26,19,30,22, 1,"406",28,18, null,null, Light.Mode.OFF);
+        // left side (doors in wall x=6)
+        w.room(1,1,5,4,   2,"BOYS CR",6,3,  null,null, Light.Mode.OFF);
+        w.room(1,6,5,9,   1,"401",6,8,      null,null, Light.Mode.OFF);
+        w.room(1,11,5,13, 1,"402",6,12,     null,null, Light.Mode.OFF);
+        w.room(1,15,5,17, 1,"FACULTY",6,16, "staff","Dirk: Locked.", Light.Mode.OFF);
+        // right side (doors in wall x=34)
+        w.room(35,1,38,8,   1,"CL 10",34,4,   null,null, Light.Mode.OFF);
+        w.room(35,10,38,13, 1,"408",34,12,    null,null, Light.Mode.OFF);
+        w.room(35,15,38,18, 1,"407",34,16,    null,null, Light.Mode.OFF);
+        w.room(35,20,38,22, 2,"GIRLS CR",34,21, null,null, Light.Mode.OFF);
+        
         w.carve(27, 1, 31, 2, 1);
         w.door(29, 3, "404", "404", null, true);
         w.roomLight(27, 1, 31, 2, Light.Mode.ON);

@@ -36,7 +36,7 @@ public class Game {
         this.profile = profile;
         Textures.init();
         world = World.build();
-        player = new Player(5.5, 21.5, 0);
+        player = new Player(10.5, 20.5, -Math.PI/2);
         stalker = new Stalker();
         objects.add(stalker);
         objects.addAll(world.initialObjects());
