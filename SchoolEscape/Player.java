@@ -15,8 +15,8 @@ public class Player {
     private int hp = 100, maxHp = 100, level = 1, xp;
     private int selected;
     private final Inventory inventory = new Inventory();
-    private final MyTree<Integer, NoteItem> journal = new MyTree<>();
-    private final FlashlightItem flashlight = new FlashlightItem();
+    private final MyTree<Integer, Item> journal = new MyTree<>();
+    private final Item flashlight = Item.flashlight();
 
     public Player(double x, double y, double angle) {
         this.x = x; this.y = y; this.angle = angle;
@@ -37,8 +37,8 @@ public class Player {
     public boolean isSprinting() { return sprinting; }
     public boolean isMoving() { return moving; }
     public Inventory getInventory() { return inventory; }
-    public MyTree<Integer, NoteItem> getJournal() { return journal; }
-    public FlashlightItem getFlashlight() { return flashlight; }
+    public MyTree<Integer, Item> getJournal() { return journal; }
+    public Item getFlashlight() { return flashlight; }
     public int getSelected() { return selected; }
     public Item getSelectedItem() { return inventory.get(selected); }
     public double distanceTo(double ox, double oy) { return Math.hypot(ox - x, oy - y); }

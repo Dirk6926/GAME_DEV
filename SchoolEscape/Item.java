@@ -1,27 +1,74 @@
 /**
- * Something lying in the school that the player can pick up.
- * INHERITANCE: Item extends GameObject. Each subclass overrides use() differently (POLYMORPHISM).
+ * A single generic item class that covers all pickupable objects in the game.
+ * The different item types are distinguished by an enum instead of many subclasses.
  */
-public abstract class Item extends GameObject implements Interactable {
+public class Item extends GameObject implements Interactable {
+    public enum Type { FLASHLIGHT, KEY, BATTERY, MEDKIT, NOTE }
+
+    private final Type type;
     private final String name, description;
+    private final String id;
+    private final int number;
+    private final String text;
+    private final boolean inventoryOnly;
     private boolean taken;
     private double t;
+    private boolean on = true;
+    private double charge = 100;
 
-    protected Item(String name, String description, double x, double y) {
-        super(x, y);
-        this.name = name;
-        this.description = description;
+    public static Item flashlight() {
+        return new Item(Type.FLASHLIGHT, "Flashlight",
+                "A heavy black flashlight. Click to switch it on and off.", null, 0, null, true, 0, 0);
     }
 
+    public static Item key(String id, String name, double x, double y) {
+        return new Item(Type.KEY, name,
+                "A key. It will open a locked door somewhere in the school.", id, 0, null, true, x, y);
+    }
+
+    public static Item battery(double x, double y) {
+        return new Item(Type.BATTERY, "Battery",
+                "Recharges the flashlight (+60%).", null, 0, null, true, x, y);
+    }
+
+    public static Item medkit(double x, double y) {
+        return new Item(Type.MEDKIT, "Medkit",
+                "Heals 40 HP.", null, 0, null, true, x, y);
+    }
+
+    public static Item note(int number, String text, double x, double y) {
+        return new Item(Type.NOTE, "Note " + number, text, null, number, text, false, x, y);
+    }
+
+    private Item(Type type, String name, String description, String id, int number, String text,
+                 boolean inventoryOnly, double x, double y) {
+        super(x, y);
+        this.type = type;
+        this.name = name;
+        this.description = description;
+        this.id = id;
+        this.number = number;
+        this.text = text;
+        this.inventoryOnly = inventoryOnly;
+    }
+
+    public Type getType() { return type; }
     public String getName() { return name; }
     public String getDescription() { return description; }
+    public String getId() { return id; }
+    public int getNumber() { return number; }
+    public String getText() { return text; }
 
-    /** What happens when the player uses this item from the hotbar. */
-    public abstract void use(Game g);
-
-    /** Notes are read instead of being stored in the hotbar. */
-    protected boolean goesToInventory() { return true; }
-    protected void onPickUp(Game g) { }
+    public boolean isFlashlight() { return type == Type.FLASHLIGHT; }
+    public boolean isOn() { return type == Type.FLASHLIGHT && on && charge > 0; }
+    public double getCharge() { return charge; }
+    public void recharge(double amount) { if (type == Type.FLASHLIGHT) charge = Math.min(100, charge + amount); }
+    public void toggle() { if (type == Type.FLASHLIGHT && charge > 0) on = !on; }
+    public void drain(double dt) {
+        if (type != Type.FLASHLIGHT || !isOn()) return;
+        charge = Math.max(0, charge - dt * 0.30);
+        if (charge <= 0) on = false;
+    }
 
     @Override
     public final void interact(Game g) {
@@ -37,113 +84,94 @@ public abstract class Item extends GameObject implements Interactable {
         onPickUp(g);
     }
 
-    @Override public String prompt() { return "Pick up " + name; }
+    protected boolean goesToInventory() { return inventoryOnly; }
+    protected void onPickUp(Game g) {
+        switch (type) {
+            case KEY:
+                g.onKeyFound(id);
+                return;
+            case NOTE:
+                g.player().getJournal().insert(number, this);
+                g.addXp(15);
+                g.showNote(this);
+                return;
+            case FLASHLIGHT:
+            case BATTERY:
+            case MEDKIT:
+                default:
+                    return;
+        }
+    }
+
+    @Override public String prompt() {
+        if (type == Type.NOTE) return "Read note";
+        return "Pick up " + name;
+    }
     @Override public boolean canInteract(Game g) { return !taken; }
     @Override public void update(Game g, double dt) { t += dt; }
     @Override public double lift() { return 0.05 + 0.02 * Math.sin(t * 2.2); }
-    @Override public double glow() { return 0.30; }
+    @Override public double glow() {
+        if (type == Type.FLASHLIGHT) return 0.30;
+        if (type == Type.KEY) return 0.6;
+        return 0.0;
+    }
     @Override public boolean visible() { return !taken; }
-}
 
-/** The flashlight: has a battery that drains while it is switched on. */
-class FlashlightItem extends Item {
-    private double charge = 100;
-    private boolean on = true;
-
-    public FlashlightItem() { super("Flashlight", "A heavy black flashlight. Click to switch it on and off.", 0, 0); }
-
-    public double getCharge() { return charge; }
-    public boolean isOn() { return on && charge > 0; }
-    public void recharge(double amount) { charge = Math.min(100, charge + amount); }
-    public void toggle() { if (charge > 0) on = !on; }
-
-    public void drain(double dt) {
-        if (!isOn()) return;
-        charge = Math.max(0, charge - dt * 0.30);
-        if (charge <= 0) on = false;
-    }
-
-    @Override public void use(Game g) { toggle(); g.sfx("click"); }
-    @Override public Sprite sprite() { return Textures.flashlight; }
-    @Override public double height() { return 0.12; }
-}
-
-/** A key. The id says which door it opens. */
-class KeyItem extends Item {
-    private final String id;
-
-    public KeyItem(String id, String name, double x, double y) {
-        super(name, "A key. It will open a locked door somewhere in the school.", x, y);
-        this.id = id;
-    }
-
-    public String getId() { return id; }
-    @Override public void use(Game g) { g.say("Dirk: " + getName() + ". Now I need to find the door it fits."); }
-    @Override public Sprite sprite() { return Textures.key; }
-    @Override public double height() { return 0.2; }
-    @Override public double glow() { return 0.6; }
-
-    @Override
-    protected void onPickUp(Game g) { g.onKeyFound(id); }
-}
-
-/** Recharges the flashlight. */
-class BatteryItem extends Item {
-    public BatteryItem(double x, double y) { super("Battery", "Recharges the flashlight (+60%).", x, y); }
-
-    @Override
     public void use(Game g) {
-        FlashlightItem f = g.player().getFlashlight();
-        if (f == null) return;
-        f.recharge(60);
-        g.player().getInventory().remove(this);
-        g.sfx("pickup");
-        g.say("Dirk: The flashlight is brighter again.");
+        switch (type) {
+            case FLASHLIGHT:
+                toggle();
+                g.sfx("click");
+                return;
+            case KEY:
+                g.say("Dirk: " + getName() + ". Now I need to find the door it fits.");
+                return;
+            case BATTERY:
+                Item flashlight = g.player().getFlashlight();
+                if (flashlight != null) {
+                    flashlight.recharge(60);
+                    g.player().getInventory().remove(this);
+                    g.sfx("pickup");
+                    g.say("Dirk: The flashlight is brighter again.");
+                }
+                return;
+            case MEDKIT:
+                if (g.player().getHp() >= g.player().getMaxHp()) {
+                    g.say("Dirk: I'm not hurt right now.");
+                    return;
+                }
+                g.player().heal(40);
+                g.player().getInventory().remove(this);
+                g.sfx("pickup");
+                g.say("Dirk: That feels a little better.");
+                return;
+            case NOTE:
+                g.showNote(this);
+                return;
+            default:
+                return;
+        }
     }
 
-    @Override public Sprite sprite() { return Textures.battery; }
-    @Override public double height() { return 0.2; }
-}
-
-/** Heals the player. */
-class MedkitItem extends Item {
-    public MedkitItem(double x, double y) { super("Medkit", "Heals 40 HP.", x, y); }
-
-    @Override
-    public void use(Game g) {
-        if (g.player().getHp() >= g.player().getMaxHp()) { g.say("Dirk: I'm not hurt right now."); return; }
-        g.player().heal(40);
-        g.player().getInventory().remove(this);
-        g.sfx("pickup");
-        g.say("Dirk: That feels a little better.");
+    @Override public Sprite sprite() {
+        switch (type) {
+            case FLASHLIGHT: return Textures.flashlight;
+            case KEY: return Textures.key;
+            case BATTERY: return Textures.battery;
+            case MEDKIT: return Textures.medkit;
+            case NOTE: return Textures.note;
+            default: return null;
+        }
     }
 
-    @Override public Sprite sprite() { return Textures.medkit; }
-    @Override public double height() { return 0.16; }
-}
-
-/** A page of writing. It goes into the journal, which is stored in a binary search tree. */
-class NoteItem extends Item {
-    private final int number;
-    private final String text;
-
-    public NoteItem(int number, String text, double x, double y) {
-        super("Note " + number, text, x, y);
-        this.number = number;
-        this.text = text;
-    }
-
-    public int getNumber() { return number; }
-    public String getText() { return text; }
-    @Override protected boolean goesToInventory() { return false; }
-    @Override public void use(Game g) { g.showNote(this); }
-    @Override public Sprite sprite() { return Textures.note; }
-    @Override public double height() { return 0.2; }
-
-    @Override
-    protected void onPickUp(Game g) {
-        g.player().getJournal().insert(number, this);
-        g.addXp(15);
-        g.showNote(this);
+    @Override public double height() {
+        switch (type) {
+            case FLASHLIGHT: return 0.12;
+            case KEY: return 0.2;
+            case BATTERY: return 0.2;
+            case MEDKIT: return 0.16;
+            case NOTE: return 0.2;
+            default: return 0.2;
+        }
     }
 }

@@ -222,7 +222,10 @@ public class Renderer {
         double perp = side == 0 ? sdx - ddx : sdy - ddy;
         if (perp < 0.04) perp = 0.04;
         zbuf[x] = perp;
-        Textures.Wall wt = Textures.wall(world.tile(mx, my));
+
+        int fromX = side == 0 ? mx - stepX : mx, fromY = side == 1 ? my - stepY : my;
+        Textures.Wall wt = Textures.wallFor(world.tile(mx, my), world.floorType(fromX, fromY));
+        
         double hitX = px + perp * rdx, hitY = py + perp * rdy;
         double wallX = side == 0 ? hitY : hitX;
         wallX -= Math.floor(wallX);
@@ -264,14 +267,27 @@ public class Renderer {
             if (hPx < 1) continue;
             double bottom = horizon + (camZ - o.lift()) * H / depth, top = bottom - hPx;
             int x0 = (int) (sxc - wPx / 2), x1 = (int) (sxc + wPx / 2);
+            if (o instanceof Door d) {
+                double swing = d.getSwing();
+                double swingOffset = Math.sin(swing) * wPx * 0.8;
+                x0 = (int) (sxc - wPx / 2 + swingOffset);
+                x1 = (int) (sxc + wPx / 2 + swingOffset);
+                wPx = Math.max(2, x1 - x0);
+            }
             double len = Math.hypot(dx, dy) + 1e-9;
             double nxs = -dx / len, nys = -dy / len;
             shade(o.getX(), o.getY(), o.lift() + o.height() * 0.5, nxs, nys, 0, 0, lit);
             double glow = o.glow(), alpha = o.alpha();
             for (int sx = Math.max(0, x0); sx <= Math.min(W - 1, x1); sx++) {
                 if (depth >= zbuf[sx]) continue;
-                int u = (int) ((sx - x0) / wPx * sp.w);
+                int u = (int) ((sx - x0) / Math.max(1, x1 - x0) * sp.w);
                 if (u < 0 || u >= sp.w) continue;
+                if (o instanceof Door d) {
+                    double swing = d.getSwing();
+                    int center = sp.w / 2;
+                    int offset = (int) (Math.sin(swing) * sp.w * 0.45);
+                    u = Math.max(0, Math.min(sp.w - 1, center + (u - center) + offset));
+                }
                 for (int sy = Math.max(0, (int) top); sy <= Math.min(H - 1, (int) bottom); sy++) {
                     int v = (int) ((sy - top) / hPx * sp.h);
                     if (v < 0 || v >= sp.h) continue;

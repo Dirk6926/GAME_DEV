@@ -1,114 +1,140 @@
 /**
- * Furniture and doors. ABSTRACT: each kind of prop decides what happens in onInteract().
+ * Furniture, decorative props, locked containers, and doors.
+ * Similar object types are merged into one generalized Prop class to reduce clutter.
  */
-public abstract class Prop extends GameObject implements Interactable {
+public class Prop extends GameObject implements Interactable {
+    public enum Kind { PLANT, LOCKER, DRAWER, CHAINED_EXIT }
+
+    private final Kind kind;
+    private final Item loot;
+    private final String emptyMessage;
+    private final String promptText;
+    private final String sound;
     private boolean used;
 
-    protected Prop(double x, double y) { super(x, y); }
+    public static Prop plant(double x, double y) {
+        return new Prop(Kind.PLANT, x, y, null, null, null, null);
+    }
 
-    protected abstract void onInteract(Game g);
+    public static Prop locker(double x, double y, Item loot) {
+        return new Prop(Kind.LOCKER, x, y, loot,
+                "Dirk: Just old gym clothes and a rotten apple.", "Search locker", "locker");
+    }
 
-    @Override
-    public final void interact(Game g) {
-        used = true;
-        onInteract(g);
+    public static Prop drawer(double x, double y, Item loot) {
+        return new Prop(Kind.DRAWER, x, y, loot,
+                "Dirk: Nothing useful in here.", "Search desk drawer", "drawer");
+    }
+
+    public static Prop chainedExit(double x, double y) {
+        return new Prop(Kind.CHAINED_EXIT, x, y, null,
+                "Dirk: Chained shut from the outside. The only way out is Room 404.", "Try the exit", "locked");
+    }
+
+    protected Prop(Kind kind, double x, double y, Item loot, String emptyMessage, String promptText, String sound) {
+        super(x, y);
+        this.kind = kind;
+        this.loot = loot;
+        this.emptyMessage = emptyMessage;
+        this.promptText = promptText;
+        this.sound = sound;
     }
 
     public boolean isUsed() { return used; }
-    @Override public boolean canInteract(Game g) { return true; }
-    @Override public String prompt() { return "Use"; }
-    @Override public void update(Game g, double dt) { }
-}
-
-/** A potted plant: decoration that blocks the way. */
-class Plant extends Prop {
-    public Plant(double x, double y) { super(x, y); }
-    @Override protected void onInteract(Game g) { }
-    @Override public boolean canInteract(Game g) { return false; }
-    @Override public Sprite sprite() { return Textures.plant; }
-    @Override public double height() { return 0.95; }
-    @Override public double solidRadius() { return 0.22; }
-}
-
-/** Something the player can search (INHERITANCE: lockers and drawers share this behaviour). */
-abstract class Searchable extends Prop {
-    private final Item loot;
-    private final String emptyMessage;
-
-    protected Searchable(double x, double y, Item loot, String emptyMessage) {
-        super(x, y);
-        this.loot = loot;
-        this.emptyMessage = emptyMessage;
-    }
-
-    protected abstract String verb();
-    protected abstract String sound();
-
-    @Override public String prompt() { return verb(); }
-    @Override public boolean canInteract(Game g) { return !isUsed(); }
 
     @Override
-    protected void onInteract(Game g) {
-        g.sfx(sound());
+    public final void interact(Game g) {
+        if (kind == Kind.PLANT) return;
+        if (kind == Kind.CHAINED_EXIT) {
+            g.sfx("locked");
+            g.say(emptyMessage);
+            return;
+        }
+        used = true;
+        g.sfx(sound);
         if (loot == null) { g.say(emptyMessage); return; }
         loot.setPosition(getX(), getY());
         loot.interact(g);
     }
-}
 
-class LockerSpot extends Searchable {
-    public LockerSpot(double x, double y, Item loot) { super(x, y, loot, "Dirk: Just old gym clothes and a rotten apple."); }
-    @Override protected String verb() { return "Search locker"; }
-    @Override protected String sound() { return "locker"; }
-}
-
-class DeskDrawer extends Searchable {
-    private final double lx, ly;
-    public DeskDrawer(double x, double y, Item loot) { super(x, y, loot, "Dirk: Nothing useful in here."); lx = x; ly = y; }
-    @Override protected String verb() { return "Search desk drawer"; }
-    @Override protected String sound() { return "drawer"; }
-    @Override public Sprite sprite() { return null; }
-}
-
-/** The chained emergency exits: they never open. */
-class ChainedExit extends Prop {
-    public ChainedExit(double x, double y) { super(x, y); }
-    @Override public String prompt() { return "Try the exit"; }
-    @Override protected void onInteract(Game g) {
-        g.sfx("locked");
-        g.say("Dirk: Chained shut from the outside. The only way out is Room 404.");
-    }
+    @Override public boolean canInteract(Game g) { return !used && kind != Kind.PLANT; }
+    @Override public String prompt() { return promptText == null ? "Use" : promptText; }
+    @Override public void update(Game g, double dt) { }
+    @Override public Sprite sprite() { return kind == Kind.PLANT ? Textures.plant : null; }
+    @Override public double height() { return kind == Kind.PLANT ? 0.95 : 0.0; }
+    @Override public double solidRadius() { return kind == Kind.PLANT ? 0.22 : 0.0; }
 }
 
 /** A classroom or office door that is part of the wall until it is opened. */
-class Door extends Prop {
+class Door extends GameObject implements Interactable {
+    private static final double SWING_SPEED = 2.8;
     private final int tx, ty, tileId;
     private final String label, keyId, lockedMessage;
+    private final Sprite sprite;
     private boolean open;
     private boolean locked;
+    private double swing;
 
     public Door(int tx, int ty, int tileId, String label, String keyId, String lockedMessage) {
         super(tx + 0.5, ty + 0.5);
         this.tx = tx; this.ty = ty; this.tileId = tileId;
         this.label = label; this.keyId = keyId; this.lockedMessage = lockedMessage;
         this.locked = keyId != null;
+        this.sprite = makeDoorSprite(label);
+    }
+
+    private static Sprite makeDoorSprite(String text) {
+        int w = 128, h = 224;
+        int[] px = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int r = 100 + (x / 8) % 10, g = 70 + (y / 10) % 7, b = 55;
+                px[y * w + x] = 0xFF000000 | (r << 16) | (g << 8) | b;
+                if (x < 6 || x > w - 7 || y < 6 || y > h - 7) px[y * w + x] = 0xFF303128;
+            }
+        }
+        for (int x = 10; x < w - 10; x++) {
+            int y0 = 24, y1 = h - 24;
+            int v = x < w / 2 ? 85 : 80;
+            for (int y = y0; y <= y1; y++) if ((y - y0) % 18 == 0) px[y * w + x] = 0xFF000000 | (v << 16) | (v << 8) | v;
+        }
+        for (int y = 0; y < h; y++) {
+            int edge = 0xFF1c1c1a;
+            px[y * w + 0] = edge; px[y * w + w - 1] = edge;
+        }
+        return new Sprite(w, h, px);
     }
 
     public int getTileId() { return tileId; }
     public String getLabel() { return label; }
     public boolean isLocked() { return locked; }
     public boolean isOpen() { return open; }
+    public double getSwing() { return swing; }
 
-    @Override
-    public String prompt() {
+    @Override public String prompt() {
         if (open) return "Close door";
         return locked ? "Locked door (" + label + ")" : "Open door (" + label + ")";
     }
 
+    @Override public boolean canInteract(Game g) { return true; }
+    @Override public void update(Game g, double dt) {
+        if (open && swing < 1.2) swing = Math.min(1.2, swing + dt * SWING_SPEED);
+        else if (!open && swing > 0.0) swing = Math.max(0.0, swing - dt * SWING_SPEED);
+    }
+
+    @Override public Sprite sprite() { return open || swing > 0.02 ? sprite : null; }
+    @Override public boolean visible() { return true; }
+    @Override public double height() { return 1.75; }
+    @Override public double lift() { return 0; }
+
     @Override
-    protected void onInteract(Game g) {
+    public void interact(Game g) {
         if (open) {
-            if (g.player().distanceTo(getX(), getY()) > 1.1) { open = false; g.world().setTile(tx, ty, tileId); g.sfx("creak"); }
+            if (g.player().distanceTo(getX(), getY()) > 1.1) {
+                open = false;
+                g.world().setTile(tx, ty, tileId);
+                g.sfx("creak");
+            }
             return;
         }
         if (locked) {
@@ -136,7 +162,7 @@ class Door extends Prop {
     protected void onUnlocked(Game g) { }
 }
 
-/** Room 404: opening it with the right key ends the game. POLYMORPHISM: overrides onUnlocked(). */
+/** Room 404: opening it with the right key ends the game. */
 class EscapeDoor extends Door {
     public EscapeDoor(int tx, int ty, int tileId, String keyId) {
         super(tx, ty, tileId, "404", keyId, "Dirk: Room 404 is locked. There must be a key somewhere in this school.");

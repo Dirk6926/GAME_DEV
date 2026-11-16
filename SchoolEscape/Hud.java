@@ -182,7 +182,7 @@ public class Hud {
             Item it = p.getInventory().get(i);
             if (it != null) {
                 Sprite sp = it.sprite();
-                if (it instanceof FlashlightItem) icon(g, x, y, sz, sp, FlashlightItem.class.cast(it));
+                if (it.isFlashlight()) icon(g, x, y, sz, sp, it);
                 else icon(g, x, y, sz, sp, null);
             }
         }
@@ -190,13 +190,13 @@ public class Hud {
         if (cur != null) {
             g.setFont(f12); g.setColor(Color.WHITE);
             String n = cur.getName();
-            if (cur instanceof FlashlightItem) n += "  " + (int) ((FlashlightItem) cur).getCharge() + "%" + (((FlashlightItem) cur).isOn() ? "  ON" : "  OFF");
+            if (cur.isFlashlight()) n += "  " + (int) cur.getCharge() + "%" + (cur.isOn() ? "  ON" : "  OFF");
             int sw = g.getFontMetrics().stringWidth(n);
             g.drawString(n, vw / 2 - sw / 2, y - 8);
         }
     }
 
-    private void icon(Graphics2D g, int x, int y, int sz, Sprite sp, FlashlightItem f) {
+    private void icon(Graphics2D g, int x, int y, int sz, Sprite sp, Item f) {
         if (sp == null) return;
         BufferedImage im = new BufferedImage(sp.w, sp.h, BufferedImage.TYPE_INT_ARGB);
         im.setRGB(0, 0, sp.w, sp.h, sp.px, 0, sp.w);
@@ -239,7 +239,7 @@ public class Hud {
     /** The first-person hand and flashlight in the bottom-right corner. */
     private void drawFlashlight(Graphics2D g, Game game, int w, int h) {
         Player p = game.player();
-        if (!(p.getSelectedItem() instanceof FlashlightItem)) return;
+        if (p.getSelectedItem() == null || !p.getSelectedItem().isFlashlight()) return;
         double bob = p.isMoving() ? Math.sin(game.time() * (p.isSprinting() ? 13 : 8)) * 7 : Math.sin(game.time() * 1.6) * 2;
         double bx = w * 0.80, by = h * 0.98 + bob + Math.abs(bob) * 0.4;
         AffineTransform t0 = g.getTransform();
@@ -309,9 +309,9 @@ public class Hud {
                     g.setFont(f12.deriveFont((float) (18 * s)));
                     g.setColor(new Color(235, 235, 240));
                     int[] y = {(int) (h * 0.28)};
-                    MyTree<Integer, NoteItem> tree = p.getJournal();
+                    MyTree<Integer, Item> tree = p.getJournal();
                     if (tree.size() == 0) g.drawString("No notes found yet.", (int) (w * 0.3), y[0]);
-                    for (NoteItem n : tree.inOrder()) {
+                    for (Item n : tree.inOrder()) {
                         y[0] = wrapPx(g, n.getNumber() + ".  " + n.getText(), (int) (w * 0.2), y[0], (int) (w * 0.6), (int) (26 * s)) + (int) (14 * s);
                     }
                 }

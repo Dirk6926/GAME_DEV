@@ -14,7 +14,7 @@ public class Inventory {
     public Item get(int i) { return i >= 0 && i < items.size() ? items.get(i) : null; }
 
     public boolean hasKey(String id) {
-        for (Item it : items) if (it instanceof KeyItem && ((KeyItem) it).getId().equals(id)) return true;
+        for (Item it : items) if (it.getType() == Item.Type.KEY && id.equals(it.getId())) return true;
         return false;
     }
 }

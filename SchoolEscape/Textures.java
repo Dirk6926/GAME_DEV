@@ -35,6 +35,105 @@ public final class Textures {
     public static Sprite plant, stalker, flashlight, key, battery, note, medkit;
     private static boolean ready;
 
+    /* ===================== WALL STYLE SETTINGS (edit these) =====================
+     * Colours are {red, green, blue}, each 0..255.  UPPER = the top part of the wall,
+     * LOWER = the dark part below the chair rail.
+     * Cracks: 0 = none, 0.5 = one small crack per wall, 1 = two, 2 = four, ...
+     * *_IMAGE: true = use your picture (assets/wall_CR.jpg) instead of painted plaster.
+     * The three styles are used by what is on the floor the wall faces, so one wall can look
+     * different on each side: hallway side / classroom side / restroom side.
+     */
+    private static final int[] HALL_UPPER = {206, 204, 192}, HALL_LOWER = {66, 80, 86};     // hallways (cream + teal)
+    private static final int[] ROOM_UPPER = {214, 200, 170}, ROOM_LOWER = {104, 72, 56};    // classrooms (warm + brown)
+    private static final int[] CR_UPPER   = {196, 214, 216}, CR_LOWER   = {82, 118, 128};   // restrooms (pale blue)
+    private static final double HALL_CRACKS = 0.5, ROOM_CRACKS = 0.5, CR_CRACKS = 0.0;
+    private static final boolean HALL_IMAGE = false, ROOM_IMAGE = false, CR_IMAGE = true;
+
+    /** The plain wall for each kind of floor it faces: 0 = hallway, 1 = classroom, 2 = restroom. */
+    private static final Wall[] plainByFloor = new Wall[3];
+
+    /** Name of the picture used for walls and the restroom floor (looked for in the assets folder). */
+    private static final String WALL_IMG_NAME = "wall_CR";
+    /** The base wall every wall type is painted on top of (the picture, or the plaster if no picture is found). */
+    private static int[] baseWall;
+
+    /** Looks for assets/wall_CR.jpg (also .jpeg / .png) from the folder the game runs in, and prints what it finds. */
+    private static BufferedImage findWallImage() {
+        String[] dirs = {"assets", "SchoolEscape/assets", "../assets"};
+        String[] exts = {".jpg", ".jpeg", ".png", ".jpg.jpg"};      // .jpg.jpg = Windows hiding the real extension
+        for (String d : dirs)
+            for (String e : exts) {
+                java.io.File f = new java.io.File(d, WALL_IMG_NAME + e);
+                if (!f.isFile()) continue;
+                try {
+                    BufferedImage im = javax.imageio.ImageIO.read(f);
+                    if (im != null) { System.out.println("[Textures] loaded " + f.getAbsolutePath()); return im; }
+                    System.err.println("[Textures] found " + f.getAbsolutePath() + " but Java cannot read it. Re-save it as a normal RGB .png or .jpg.");
+                } catch (Exception ex) {
+                    System.err.println("[Textures] could not read " + f.getAbsolutePath() + ": " + ex.getMessage()
+                            + "  (re-save it as a normal RGB .png or .jpg)");
+                }
+            }
+        System.err.println("[Textures] wall image not found. The game is running from: " + new java.io.File(".").getAbsolutePath());
+        for (String d : dirs) {
+            java.io.File dir = new java.io.File(d);
+            if (dir.isDirectory()) System.err.println("[Textures] files in " + dir.getAbsolutePath() + ": " + java.util.Arrays.toString(dir.list()));
+        }
+        return null;
+    }
+
+    /** Scales an image to w x h as opaque ARGB pixels. */
+    private static int[] scaled(BufferedImage src, int w, int h) {
+        BufferedImage im = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = im.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(src, 0, 0, w, h, null);
+        g.dispose();
+        int[] a = im.getRGB(0, 0, w, h, null, 0, w);
+        for (int i = 0; i < a.length; i++) a[i] |= 0xFF000000;          // fully opaque = no glow
+        return a;
+    }
+
+    /** Multiplies one pixel's colour by f (f < 1 = darker), keeping its alpha. */
+    private static void darken(int[] a, int x, int y, double f) {
+        if (x < 0 || y < 0 || x >= TW || y >= TH) return;
+        int c = a[y * TW + x];
+        a[y * TW + x] = (c & 0xFF000000) | (cl((int) (((c >> 16) & 255) * f)) << 16)
+                | (cl((int) (((c >> 8) & 255) * f)) << 8) | cl((int) ((c & 255) * f));
+    }
+
+    /** One jagged crack that wanders downward and sometimes splits in two. */
+    private static void crack(int[] a, double x, double y, double ang, int len, Random r, int depth) {
+        for (int i = 0; i < len; i++) {
+            ang += (r.nextDouble() - 0.5) * 0.9;
+            ang = Math.PI / 2 + (ang - Math.PI / 2) * 0.92;              // keep it mostly heading down
+            x += Math.cos(ang) * 1.3; y += Math.sin(ang) * 1.3;
+            int xi = (int) x, yi = (int) y;
+            if (xi < 1 || xi >= TW - 1 || yi < 0 || yi >= (int) (TH * 0.92)) return;
+            darken(a, xi, yi, 0.55);
+            darken(a, xi + 1, yi, 0.82);                                   // soft edge
+            if (depth < 1 && r.nextInt(22) == 0)
+                crack(a, x, y, ang + (r.nextBoolean() ? 0.8 : -0.8), len / 3 + 6, r, depth + 1);
+        }
+    }
+
+    /** Scatters cracks over a wall texture. amount: 0 = none, 1 = a few, 3 = lots. */
+    private static void addCracks(int[] a, double amount, int seed) {
+        if (amount <= 0) return;
+        Random r = new Random(seed);
+        int count = Math.max(1, (int) Math.round(amount * 2));
+        for (int c = 0; c < count; c++)
+            crack(a, 6 + r.nextInt(TW - 12), r.nextInt((int) (TH * 0.30)), Math.PI / 2 + (r.nextDouble() - 0.5) * 0.8,
+                    30 + r.nextInt(50), r, 0);
+    }
+
+    /** Builds the plain wall for one area: your picture or painted plaster, then cracks. */
+    private static int[] styledWall(BufferedImage img, boolean useImage, int[] upper, int[] lower, double cracks, int seed) {
+        int[] a = useImage && img != null ? scaled(img, TW, TH) : plaster(upper, lower);
+        addCracks(a, cracks, seed);
+        return a;
+    }
+
     /* ----------------------------------------------------------- helpers */
     static int cl(int v) { return v < 0 ? 0 : Math.min(v, 255); }
     static int rgb(int r, int g, int b) { return 0xFF000000 | (cl(r) << 16) | (cl(g) << 8) | cl(b); }
@@ -100,7 +199,13 @@ public final class Textures {
     public static synchronized void init() {
         if (ready) return;
         ready = true;
-        walls[Tile.WALL] = new Wall(plaster(), 0.08);
+        BufferedImage wallImg = findWallImage();
+        int[] hall = styledWall(wallImg, HALL_IMAGE, HALL_UPPER, HALL_LOWER, HALL_CRACKS, 101);
+        baseWall = hall;                                                // hallway wall = base for lockers, windows, doors...
+        plainByFloor[0] = new Wall(hall, 0.08);
+        plainByFloor[1] = new Wall(styledWall(wallImg, ROOM_IMAGE, ROOM_UPPER, ROOM_LOWER, ROOM_CRACKS, 202), 0.08);
+        plainByFloor[2] = new Wall(styledWall(wallImg, CR_IMAGE, CR_UPPER, CR_LOWER, CR_CRACKS, 303), 0.25);
+        walls[Tile.WALL] = plainByFloor[0];
         walls[Tile.LOCKER] = new Wall(lockers(), 0.38);
         walls[Tile.WINDOW] = new Wall(window(), 0.55);
         walls[Tile.BANNER] = new Wall(banner(), 0.12);
@@ -109,6 +214,11 @@ public final class Textures {
         walls[Tile.EXIT] = new Wall(exitDoor(), 0.3);
         buildCeiling();
         buildFloors();
+        if (wallImg != null) {                       // 0 = hall tiles, 1 = room wood, 2 = concrete (the restrooms)
+            floors[2] = scaled(wallImg, FS, FS);
+            gloss[2] = new float[FS * FS];
+            java.util.Arrays.fill(gloss[2], 0.15f);    // 0 = matte, 1 = very shiny
+        }
         buildSprites();
     }
 
@@ -117,10 +227,23 @@ public final class Textures {
         return w != null ? w : walls[Tile.WALL];
     }
 
+    /**
+     * The texture of a wall face. floorType = the floor of the cell the viewer is standing next to
+     * (0 hallway, 1 classroom, 2 restroom). Lockers, windows, boards... only face the hallway;
+     * from a room the same wall shows that room's plain wall.
+     */
+    public static Wall wallFor(int tile, int floorType) {
+        boolean decorated = tile == Tile.LOCKER || tile == Tile.WINDOW || tile == Tile.BANNER
+                || tile == Tile.BOARD || tile == Tile.EXTINGUISHER;
+        if (tile == Tile.WALL || (decorated && floorType != 0))
+            return plainByFloor[floorType < 0 || floorType > 2 ? 0 : floorType];
+        return wall(tile);
+    }
+
     public static void registerDoor(int tile, String label) { walls[tile] = new Wall(door(label), 0.3); }
 
     /* ----------------------------------------------------------- walls */
-    private static int[] plaster() {
+    private static int[] plaster(int[] upper, int[] lower) {
         int[] a = new int[TW * TH];
         for (int y = 0; y < TH; y++) {
             double t = y / (double) TH;
@@ -128,7 +251,7 @@ public final class Textures {
                 double n = vnoise(x / 22.0, y / 22.0, 3) * 0.20 + vnoise(x / 5.0, y / 5.0, 5) * 0.07
                         + (rnd(x, y, 7) - 0.5) * 0.05;
                 int r, g, b;
-                if (t < 0.60) { r = 206; g = 204; b = 192; } else { r = 66; g = 80; b = 86; }
+                if (t < 0.60) { r = upper[0]; g = upper[1]; b = upper[2]; } else { r = lower[0]; g = lower[1]; b = lower[2]; }
                 if (t >= 0.592 && t < 0.616) { r = 150; g = 148; b = 140; }          // chair rail
                 if (t > 0.965) { r = 26; g = 26; b = 30; }                          // baseboard
                 double stain = vnoise(x / 3.0, y / 70.0, 11);
@@ -142,7 +265,7 @@ public final class Textures {
     }
 
     private static int[] lockers() {
-        BufferedImage im = image(plaster(), TW, TH);
+        BufferedImage im = image(baseWall, TW, TH);
         Graphics2D g = gfx(im);
         int top = 62, bot = 214, w = 40;
         for (int i = 0; i < 3; i++) {
@@ -174,7 +297,7 @@ public final class Textures {
     }
 
     private static int[] window() {
-        BufferedImage im = image(plaster(), TW, TH);
+        BufferedImage im = image(baseWall, TW, TH);
         Graphics2D g = gfx(im);
         int x0 = 10, y0 = 46, x1 = 118, y1 = 146;
         g.setColor(new Color(46, 48, 52));
@@ -210,7 +333,7 @@ public final class Textures {
     }
 
     private static int[] banner() {
-        BufferedImage im = image(plaster(), TW, TH);
+        BufferedImage im = image(baseWall, TW, TH);
         Graphics2D g = gfx(im);
         g.setColor(new Color(60, 40, 26));
         g.fillRoundRect(16, 30, 96, 7, 4, 4);                                             // rod
@@ -233,7 +356,7 @@ public final class Textures {
     }
 
     private static int[] board() {
-        BufferedImage im = image(plaster(), TW, TH);
+        BufferedImage im = image(baseWall, TW, TH);
         Graphics2D g = gfx(im);
         g.setColor(new Color(92, 62, 36));
         g.fillRect(12, 48, 104, 100);
@@ -259,7 +382,7 @@ public final class Textures {
     }
 
     private static int[] extinguisherCabinet() {
-        BufferedImage im = image(plaster(), TW, TH);
+        BufferedImage im = image(baseWall, TW, TH);
         Graphics2D g = gfx(im);
         g.setColor(new Color(150, 22, 22));
         g.fillRoundRect(36, 74, 56, 98, 6, 6);
@@ -281,7 +404,7 @@ public final class Textures {
     }
 
     private static int[] exitDoor() {
-        BufferedImage im = image(plaster(), TW, TH);
+        BufferedImage im = image(baseWall, TW, TH);
         Graphics2D g = gfx(im);
         g.setPaint(new GradientPaint(0, 40, new Color(96, 100, 106), 0, TH, new Color(52, 56, 62)));
         g.fillRect(10, 40, 108, TH - 40);
@@ -306,7 +429,7 @@ public final class Textures {
     }
 
     private static int[] door(String label) {
-        BufferedImage im = image(plaster(), TW, TH);
+        BufferedImage im = image(baseWall, TW, TH);
         int[] base = pixels(im);
         for (int y = 36; y < TH - 2; y++)
             for (int x = 26; x < 102; x++) {

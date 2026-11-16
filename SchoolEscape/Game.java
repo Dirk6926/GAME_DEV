@@ -21,7 +21,7 @@ public class Game {
     private String toastText = "";
     private String objective = "Find the key to Room 404 and escape the school.";
     private Interactable target;
-    private NoteItem shownNote;
+    private Item shownNote;
     private int stage;
     private int menuSel;
 
@@ -36,7 +36,7 @@ public class Game {
         this.profile = profile;
         Textures.init();
         world = World.build();
-        player = new Player(10.5, 20.5, -Math.PI/2);
+        player = new Player(21.0, 34.5, -Math.PI / 2);
         stalker = new Stalker();
         objects.add(stalker);
         objects.addAll(world.initialObjects());
@@ -55,7 +55,7 @@ public class Game {
     public String objective() { return objective; }
     public String line() { return lineTimer > 0 ? line : ""; }
     public Interactable target() { return target; }
-    public NoteItem shownNote() { return shownNote; }
+    public Item shownNote() { return shownNote; }
     public double hurtFlash() { return hurtFlash; }
     public String toastText() { return toast > 0 ? toastText : ""; }
     public double toastAlpha() { return Math.min(1, toast); }
@@ -92,11 +92,11 @@ public class Game {
     }
 
     public void win() { states.push(State.WON); sound.stopAmbient(); sfx("win"); }
-    public void showNote(NoteItem n) { shownNote = n; states.push(State.JOURNAL); }
+    public void showNote(Item n) { shownNote = n; states.push(State.JOURNAL); }
 
     public boolean flashlightOn() {
         Item it = player.getSelectedItem();
-        return it instanceof FlashlightItem && ((FlashlightItem) it).isOn();
+        return it != null && it.isFlashlight() && it.isOn();
     }
 
     public boolean inBeam(double x, double y) {
@@ -144,9 +144,9 @@ public class Game {
             if (click || in.pressed(KeyEvent.VK_Q)) {
                 Item it = player.getSelectedItem();
                 if (it != null) {
-                    boolean wasFlash = it instanceof FlashlightItem;
+                    boolean wasFlash = it != null && it.isFlashlight();
                     it.use(this);
-                    if (!wasFlash && !(it instanceof FlashlightItem)) { /* consumables remove themselves */ }
+                    if (!wasFlash && (it != null && !it.isFlashlight())) { /* consumables remove themselves */ }
                 }
             }
             for (GameObject o : objects) o.update(this, dt);
