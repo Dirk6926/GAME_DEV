@@ -1,14 +1,13 @@
-import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
+import javax.swing.*;
 
 /** The window content: runs the loop, draws the 3D image and the HUD, captures the mouse. */
 public class GamePanel extends JPanel {
     private Game game;
     private final MenuScreen menu = new MenuScreen();
     private volatile Game pending;
-    private boolean loadingStarted;
     private final Input input;
     private final Renderer renderer = new Renderer();
     private final Hud hud = new Hud();
@@ -26,7 +25,6 @@ public class GamePanel extends JPanel {
         setFocusTraversalKeysEnabled(false);
         addKeyListener(input);
         addMouseWheelListener(input);
-        addKeyListener(new KeyAdapter() { @Override public void keyTyped(KeyEvent e) { menu.typed(e.getKeyChar()); } });
         try { robot = new Robot(); } catch (AWTException | SecurityException e) { robot = null; }
         blank = Toolkit.getDefaultToolkit().createCustomCursor(
                 new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB), new Point(0, 0), "blank");
@@ -35,6 +33,13 @@ public class GamePanel extends JPanel {
                 requestFocusInWindow();
                 if (GamePanel.this.game == null) { menu.click(e.getX(), e.getY(), getWidth(), getHeight()); return; }
                 captured = true; input.setClick();
+            }
+        });
+        addMouseMotionListener(new MouseMotionAdapter() {
+            @Override public void mouseMoved(MouseEvent e) {
+                if (GamePanel.this.game == null) {
+                    menu.setMouse(e.getX(), e.getY(), getWidth(), getHeight());
+                }
             }
         });
         addFocusListener(new FocusAdapter() {
@@ -48,9 +53,9 @@ public class GamePanel extends JPanel {
         double dt = Math.min(0.05, (now - last) / 1e9);
         last = now;
 
-        if (game == null) {                         // title / character / loading screens
+        if (game == null) {                         // title menu / loading screen
             menu.key(input, dt);
-            if (menu.phase() == MenuScreen.Phase.CREATE && menu.wantsStart()) {
+            if (menu.phase() == MenuScreen.Phase.MAIN && menu.wantsStart()) {
                 menu.beginLoading();
                 CharacterProfile prof = menu.profile();
                 Thread th = new Thread(() -> pending = new Game(input, prof), "loader");
