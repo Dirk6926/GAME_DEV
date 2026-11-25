@@ -6,10 +6,10 @@ import java.io.File;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 
-/** Title / character creation screen and the loading screen. */
+/** Custom title menu and loading screen. */
 public class MenuScreen {
-    public enum Phase { MAIN, SETTINGS, LOADING, CREATE }
-    private static final String[] ROWS = {"Character", "Name", "Skin", "Hair style", "Hair color", "Outfit", "Glasses"};
+    public enum Phase { MAIN, SETTINGS, LOADING }
+
     private static final String[] TIPS = {
         "Running is loud. The thing in the halls is listening.",
         "Crouch (C) or walk quietly (Ctrl) to stay unheard.",
@@ -35,7 +35,6 @@ public class MenuScreen {
     private int mouseY = -1;
 
     private final Font big = new Font("SansSerif", Font.BOLD, 26);
-    private final Font mid = new Font("SansSerif", Font.PLAIN, 22);
     private final Font small = new Font("SansSerif", Font.PLAIN, 16);
 
     public MenuScreen() {
@@ -133,8 +132,6 @@ public class MenuScreen {
     public void draw(Graphics2D g, int w, int h) {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
         double s = w / 1280.0;
 
         if (background != null) {
@@ -160,7 +157,7 @@ public class MenuScreen {
         }
 
         switch (phase) {
-            case MAIN, CREATE -> mainMenu(g);
+            case MAIN -> mainMenu(g);
             case SETTINGS -> settingsMenu(g);
             case LOADING -> loading(g);
         }
@@ -217,23 +214,19 @@ public class MenuScreen {
     }
 
     private void loading(Graphics2D g) {
-        AffineTransform a = g.getTransform();
-        g.translate(560, 190); g.scale(2.0, 2.0);
-        Hud.drawBust(g, profile, t);
-        g.setTransform(a);
-        g.setFont(big); g.setColor(Color.WHITE);
-        String n = profile.getName();
-        g.drawString(n, 640 - g.getFontMetrics().stringWidth(n) / 2, 410);
-        g.setFont(mid); g.setColor(new Color(210, 215, 225));
-        String l = "Loading" + ".".repeat(1 + (int) (t * 3) % 3);
-        g.drawString(l, 640 - g.getFontMetrics().stringWidth(l) / 2, 470);
-        g.setColor(new Color(0, 0, 0, 190)); g.fillRoundRect(340, 490, 600, 20, 20, 20);
-        g.setColor(new Color(205, 30, 36)); g.fillRoundRect(340, 490, (int) (600 * progress()), 20, 20, 20);
-        g.setColor(new Color(255, 255, 255, 120)); g.drawRoundRect(340, 490, 600, 20, 20, 20);
-        g.setFont(small); g.setColor(new Color(190, 195, 205));
+        g.setFont(big);
+        g.setColor(Color.WHITE);
+        String loadingText = "LOADING";
+        g.drawString(loadingText, 640 - g.getFontMetrics().stringWidth(loadingText) / 2, 440);
+
+        g.setColor(new Color(0, 0, 0, 190));
+        g.fillRoundRect(340, 490, 600, 20, 20, 20);
+        g.setColor(new Color(205, 30, 36));
+        g.fillRoundRect(340, 490, (int) (600 * progress()), 20, 20, 20);
+
+        g.setFont(small);
+        g.setColor(new Color(190, 195, 205));
         String tip = "Tip: " + TIPS[((int) (loadTime / 1.1)) % TIPS.length];
         g.drawString(tip, 640 - g.getFontMetrics().stringWidth(tip) / 2, 550);
     }
-
-    public void typed(char c) { } // compatibility; name entry is handled by Game's name-entry state
 }
