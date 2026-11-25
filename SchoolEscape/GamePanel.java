@@ -1,7 +1,7 @@
-import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
+import javax.swing.*;
 
 /** The window content: runs the loop, draws the 3D image and the HUD, captures the mouse. */
 public class GamePanel extends JPanel {
@@ -27,6 +27,11 @@ public class GamePanel extends JPanel {
         addKeyListener(input);
         addMouseWheelListener(input);
         addKeyListener(new KeyAdapter() { @Override public void keyTyped(KeyEvent e) { menu.typed(e.getKeyChar()); } });
+        addMouseMotionListener(new MouseMotionAdapter() {
+            @Override public void mouseMoved(MouseEvent e) {
+                if (GamePanel.this.game == null) menu.setMouse(e.getX(), e.getY(), getWidth(), getHeight());
+            }
+        });
         try { robot = new Robot(); } catch (AWTException | SecurityException e) { robot = null; }
         blank = Toolkit.getDefaultToolkit().createCustomCursor(
                 new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB), new Point(0, 0), "blank");
@@ -50,7 +55,7 @@ public class GamePanel extends JPanel {
 
         if (game == null) {                         // title / character / loading screens
             menu.key(input, dt);
-            if (menu.phase() == MenuScreen.Phase.CREATE && menu.wantsStart()) {
+            if (menu.phase() == MenuScreen.Phase.MAIN && menu.wantsStart()) {
                 menu.beginLoading();
                 CharacterProfile prof = menu.profile();
                 Thread th = new Thread(() -> pending = new Game(input, prof), "loader");

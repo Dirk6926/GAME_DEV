@@ -8,7 +8,7 @@ import javax.imageio.ImageIO;
 
 /** Title / character creation screen and the loading screen. */
 public class MenuScreen {
-    public enum Phase { CREATE, LOADING }
+    public enum Phase { MAIN, SETTINGS, LOADING, CREATE }
     private static final String[] ROWS = {"Character", "Name", "Skin", "Hair style", "Hair color", "Outfit", "Glasses"};
     private static final String[] TIPS = {
         "Running is loud. The thing in the halls is listening.",
@@ -31,7 +31,9 @@ public class MenuScreen {
     private double t;
     private double loadTime;
     private boolean start;
-    private final Font title = new Font("SansSerif", Font.BOLD, 64);
+    private int mouseX = -1;
+    private int mouseY = -1;
+
     private final Font big = new Font("SansSerif", Font.BOLD, 26);
     private final Font mid = new Font("SansSerif", Font.PLAIN, 22);
     private final Font small = new Font("SansSerif", Font.PLAIN, 16);
@@ -158,7 +160,7 @@ public class MenuScreen {
         }
 
         switch (phase) {
-            case MAIN -> mainMenu(g);
+            case MAIN, CREATE -> mainMenu(g);
             case SETTINGS -> settingsMenu(g);
             case LOADING -> loading(g);
         }
@@ -232,4 +234,6 @@ public class MenuScreen {
         String tip = "Tip: " + TIPS[((int) (loadTime / 1.1)) % TIPS.length];
         g.drawString(tip, 640 - g.getFontMetrics().stringWidth(tip) / 2, 550);
     }
+
+    public void typed(char c) { } // compatibility; name entry is handled by Game's name-entry state
 }

@@ -10,6 +10,7 @@ public class Input extends KeyAdapter implements MouseWheelListener {
     private double mouseDX, mouseDY;
     private int wheel;
     private boolean click;
+    private final StringBuilder typed = new StringBuilder();
 
     @Override
     public synchronized void keyPressed(KeyEvent e) {
@@ -43,9 +44,23 @@ public class Input extends KeyAdapter implements MouseWheelListener {
     public synchronized void setClick() { click = true; }
     public synchronized boolean takeClick() { boolean c = click; click = false; return c; }
 
+    public synchronized String takeTyped() {
+        String result = typed.toString();
+        typed.setLength(0);
+        return result;
+    }
+
     /** Forget presses that happened while a menu was open. */
     public synchronized void clearEdges() {
         java.util.Arrays.fill(edge, false);
         click = false; wheel = 0; mouseDX = 0; mouseDY = 0;
+        typed.setLength(0);
+    }
+
+    @Override
+    public synchronized void keyTyped(KeyEvent e) {
+        char c = e.getKeyChar();
+        if (!Character.isISOControl(c)) typed.append(c);
+        else if (c == '\b' && typed.length() > 0) typed.deleteCharAt(typed.length() - 1);
     }
 }
