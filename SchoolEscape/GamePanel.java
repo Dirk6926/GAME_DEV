@@ -55,7 +55,7 @@ public class GamePanel extends JPanel {
 
         if (game == null) {                         // title menu / loading screen
             menu.key(input, dt);
-            if (menu.phase() == MenuScreen.Phase.MAIN && menu.wantsStart()) {
+            if (menu.wantsStart()) {
                 menu.beginLoading();
                 CharacterProfile prof = menu.profile();
                 Thread th = new Thread(() -> pending = new Game(input, prof), "loader");

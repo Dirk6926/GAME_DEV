@@ -18,6 +18,11 @@ public class Hud {
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         curW = w;
         double s = w / 1672.0;
+
+        if (game.inIntro()) {
+            overlay(g, game, w, h, s);
+            return;
+        }
         Player p = game.player();
 
         if (game.hurtFlash() > 0) {
@@ -271,6 +276,12 @@ public class Hud {
     private void overlay(Graphics2D g, Game game, int w, int h, double s) {
         Game.State st = game.state();
         if (st == Game.State.PLAYING) return;
+
+        if (st == Game.State.NAME_ENTRY) { drawNameEntry(g, game, w, h); return; }
+        if (st == Game.State.INTRO) return;
+        if (st == Game.State.DIALOGUE) { drawDialogue(g, game, w, h); return; }
+        if (st == Game.State.BLACKOUT) { g.setColor(Color.BLACK); g.fillRect(0, 0, w, h); return; }
+
         g.setColor(new Color(0, 0, 0, st == Game.State.DEAD ? 190 : 150)); g.fillRect(0, 0, w, h);
         g.setFont(b40.deriveFont((float) (44 * s)));
         FontMetrics fm = g.getFontMetrics();
@@ -343,5 +354,102 @@ public class Hud {
         g.setFont(f12.deriveFont((float) (18 * sc)));
         center(g, s, y, new Color(210, 214, 222));
         g.setFont(b40.deriveFont((float) (44 * sc)));
+    }
+
+    /* ----------------------------------------------------------- story screens */
+    private void drawNameEntry(Graphics2D g, Game game, int w, int h) {
+        g.setColor(new Color(7, 9, 14));
+        g.fillRect(0, 0, w, h);
+
+        int cx = w / 2;
+        g.setFont(b40.deriveFont((float) Math.max(30, h * 0.04)));
+        g.setColor(new Color(230, 232, 238));
+        String title = "INPUT NAME AND GENDER";
+        g.drawString(title, cx - g.getFontMetrics().stringWidth(title) / 2, (int) (h * 0.16));
+
+        int boxX = (int) (w * 0.20), boxW = (int) (w * 0.60);
+        int nameY = (int) (h * 0.25), nameH = (int) (h * 0.13);
+        boolean nameSelected = game.nameEntryField() == 0;
+        g.setColor(nameSelected ? new Color(30, 38, 54) : new Color(12, 14, 20));
+        g.fillRoundRect(boxX, nameY, boxW, nameH, 18, 18);
+        g.setColor(nameSelected ? new Color(235, 80, 80) : new Color(120, 125, 140));
+        g.setStroke(new BasicStroke(nameSelected ? 3 : 2));
+        g.drawRoundRect(boxX, nameY, boxW, nameH, 18, 18);
+
+        g.setFont(b22.deriveFont((float) (24 * h / 720.0)));
+        g.setColor(Color.WHITE);
+        String name = game.nameEntryText();
+        g.drawString(name.isEmpty() ? "Enter name: " : name, boxX + 20, nameY + nameH * 3 / 5);
+        if (nameSelected && game.nameEntryCaretVisible()) {
+            g.fillRect(boxX + 25 + g.getFontMetrics().stringWidth(name), nameY + 28, 3, nameH - 56);
+        }
+
+        int genderY = (int) (h * 0.48), genderH = (int) (h * 0.14);
+        drawGenderButton(g, (int) (w * 0.24), genderY, (int) (w * 0.24), genderH,
+                "MALE", game.nameEntryGender() == Gender.MALE);
+        drawGenderButton(g, (int) (w * 0.52), genderY, (int) (w * 0.24), genderH,
+                "FEMALE", game.nameEntryGender() == Gender.FEMALE);
+
+        int continueX = (int) (w * 0.35), continueY = (int) (h * 0.70);
+        int continueW = (int) (w * 0.30), continueH = (int) (h * 0.12);
+        g.setColor(new Color(150, 20, 28));
+        g.fillRoundRect(continueX, continueY, continueW, continueH, 16, 16);
+        g.setColor(Color.WHITE);
+        g.setFont(b22.deriveFont((float) (24 * h / 720.0)));
+        String proceed = "CONTINUE";
+        g.drawString(proceed, continueX + (continueW - g.getFontMetrics().stringWidth(proceed)) / 2,
+                continueY + continueH * 2 / 3);
+
+        if (!game.nameEntryError().isEmpty()) {
+            g.setFont(f12.deriveFont((float) (18 * h / 720.0)));
+            g.setColor(new Color(255, 100, 100));
+            g.drawString(game.nameEntryError(), cx - g.getFontMetrics().stringWidth(game.nameEntryError()) / 2,
+                    (int) (h * 0.66));
+        }
+
+        g.setFont(f12.deriveFont((float) (16 * h / 720.0)));
+        g.setColor(new Color(190, 195, 205));
+        String hint = "Type name     Enter: continue     A/D: choose gender";
+        g.drawString(hint, cx - g.getFontMetrics().stringWidth(hint) / 2, (int) (h * 0.92));
+    }
+
+    private void drawGenderButton(Graphics2D g, int x, int y, int w, int h, String label, boolean selected) {
+        g.setColor(selected ? new Color(175, 25, 32) : new Color(12, 14, 20));
+        g.fillRoundRect(x, y, w, h, 16, 16);
+        g.setColor(selected ? new Color(255, 160, 160) : new Color(120, 125, 140));
+        g.setStroke(new BasicStroke(selected ? 3 : 2));
+        g.drawRoundRect(x, y, w, h, 16, 16);
+        g.setFont(b22.deriveFont((float) (250 * h / 720.0)));
+        g.setColor(Color.WHITE);
+        g.drawString(label, x + (w - g.getFontMetrics().stringWidth(label)) / 2, y + h * 2 / 3);
+    }
+
+    private void drawDialogue(Graphics2D g, Game game, int w, int h) {
+        g.setColor(new Color(0, 0, 0, 100));
+        g.fillRect(0, 0, w, h);
+        int boxW = (int) (w * 0.78), boxH = (int) (h * 0.22);
+        int boxX = (w - boxW) / 2, boxY = h - boxH - (int) (h * 0.05);
+        g.setColor(new Color(7, 9, 14, 235));
+        g.fillRoundRect(boxX, boxY, boxW, boxH, 18, 18);
+        g.setColor(new Color(210, 215, 225, 180));
+        g.setStroke(new BasicStroke(2));
+        g.drawRoundRect(boxX, boxY, boxW, boxH, 18, 18);
+
+        String speaker = game.dialogueSpeaker();
+        g.setFont(b22.deriveFont((float) (22 * h / 720.0)));
+        if (!speaker.isEmpty()) {
+            g.setColor(new Color(255, 190, 190));
+            g.drawString(speaker, boxX + 24, boxY + 38);
+        }
+
+        g.setFont(f12.deriveFont((float) (20 * h / 720.0)));
+        g.setColor(Color.WHITE);
+        wrapPx(g, game.dialogueText(), boxX + 24, boxY + (speaker.isEmpty() ? 55 : 72), boxW - 48,
+                (int) (28 * h / 720.0));
+
+        g.setFont(f12.deriveFont((float) (15 * h / 720.0)));
+        g.setColor(new Color(190, 195, 205));
+        String hint = game.dialogueTyping() ? "" : "Enter / F / E - continue";
+        g.drawString(hint, boxX + boxW - g.getFontMetrics().stringWidth(hint) - 24, boxY + boxH - 18);
     }
 }

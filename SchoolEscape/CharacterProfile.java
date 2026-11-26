@@ -32,6 +32,7 @@ public class CharacterProfile {
     private Color hairColor = Color.BLACK; // default hair color
     private Color eyeColor = Color.BLUE;  // default eye color
     private String hairStyle = "Short";    // default hair style
+    private boolean introSeen;
 
     public CharacterProfile() { }
 
@@ -103,4 +104,7 @@ public class CharacterProfile {
 
     public int getStyle() { return 0; }
     public boolean hasGlasses() { return false; }
+
+    public boolean isIntroSeen() { return introSeen; }
+    public void setIntroSeen(boolean seen) { introSeen = seen; }
 }

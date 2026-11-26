@@ -9,7 +9,7 @@ import javax.imageio.ImageIO;
 
 /** Custom title menu and loading screen. */
 public class MenuScreen {
-    public enum Phase { MAIN, SETTINGS, LOADING }
+    public enum Phase { MAIN, SETTINGS, CREATE, LOADING }   // CREATE = the "name and gender" screen
 
     private static final String[] TIPS = {
         "Running is loud. The thing in the halls is listening.",
@@ -63,6 +63,18 @@ public class MenuScreen {
     private static final float FOG_OPACITY = 1.0f;         // 1 = as exported from Figma, lower = more see-through
 
     private final CharacterProfile profile = new CharacterProfile();
+
+    // ---- CREATE screen (name + gender) -------------------------------------------------------
+    private static final int MAX_NAME = 12;                                    // longest name allowed
+    private final StringBuilder nameBuf = new StringBuilder();                 // what the player has typed so far
+    private Gender pickedGender;                                               // null until the player picks one
+    private String createHint = "";                                            // red message ("Please enter a name.")
+    // UI GOES HERE: these are the clickable areas of the placeholder screen (design space 1280x720).
+    // When you have your Figma version, change these rectangles to match your buttons.
+    private static final Rectangle NAME_BOX    = new Rectangle(440, 270, 400, 56);
+    private static final Rectangle MALE_BOX    = new Rectangle(440, 365, 190, 56);
+    private static final Rectangle FEMALE_BOX  = new Rectangle(650, 365, 190, 56);
+    private static final Rectangle CONFIRM_BOX = new Rectangle(520, 455, 240, 56);
     private BufferedImage background;
     private BufferedImage fog;          // ready to draw (cleaned + scaled)
     private BufferedImage titleLogo;    // ready to draw (cleaned + scaled)
@@ -312,6 +324,8 @@ public class MenuScreen {
             if (in.pressed(KeyEvent.VK_ENTER)) activate(focus < 0 ? 0 : focus);
         } else if (phase == Phase.SETTINGS) {
             if (in.pressed(KeyEvent.VK_ESCAPE) || in.pressed(KeyEvent.VK_ENTER)) backToMain();
+        } else if (phase == Phase.CREATE) {
+            updateCreate(in);
         }
         in.clearEdges();
     }
@@ -330,8 +344,44 @@ public class MenuScreen {
     }
 
     private void activate(int button) {
-        if (button == 0) start = true;
+        if (button == 0) openCreate();                 // START now opens the "name and gender" screen first
         else if (button == 1) phase = Phase.SETTINGS;
+    }
+
+    /* ---------------------------------------------------------- CREATE: name + gender (backend) */
+    private void openCreate() {
+        phase = Phase.CREATE;
+        nameBuf.setLength(0);
+        pickedGender = null;
+        createHint = "";
+        usingKeyboard = false;
+    }
+
+    /** Typing, Backspace, Left/Right (or Up/Down) to pick a gender, Enter to confirm, Esc to go back. */
+    private void updateCreate(Input in) {
+        for (char c : in.takeTyped().toCharArray())
+            if (nameBuf.length() < MAX_NAME && (Character.isLetterOrDigit(c) || c == ' ' || c == '-' || c == '\'' || c == '.')) {
+                nameBuf.append(c);
+                createHint = "";
+            }
+        if (in.pressed(KeyEvent.VK_BACK_SPACE) && nameBuf.length() > 0) nameBuf.setLength(nameBuf.length() - 1);
+        if (in.pressed(KeyEvent.VK_LEFT) || in.pressed(KeyEvent.VK_UP)) { pickedGender = Gender.MALE; createHint = ""; }
+        if (in.pressed(KeyEvent.VK_RIGHT) || in.pressed(KeyEvent.VK_DOWN)) { pickedGender = Gender.FEMALE; createHint = ""; }
+        if (in.pressed(KeyEvent.VK_ENTER)) confirmCreate();
+        if (in.pressed(KeyEvent.VK_ESCAPE)) backToMain();
+    }
+
+    /** Checks the answers, stores them in the CharacterProfile, then tells GamePanel to start (wantsStart()). */
+    private void confirmCreate() {
+        String name = nameBuf.toString().trim();
+        if (name.isEmpty()) { createHint = "Please enter a name."; return; }
+        if (pickedGender == null) { createHint = "Please choose Male or Female."; return; }
+        profile.setName(name);                 // the game uses this as the character's name
+        profile.setGender(pickedGender);       // he/his or she/her in the story text
+        profile.setIntroSeen(false);           // a new character gets the opening story
+        phase = Phase.LOADING;
+        start = true;
+        loadTime = 0;
     }
 
     private void backToMain() {
@@ -349,6 +399,10 @@ public class MenuScreen {
             if (hit >= 0) { selectedButton = hit; activate(hit); }
         } else if (phase == Phase.SETTINGS) {
             backToMain();
+        } else if (phase == Phase.CREATE) {
+            if (MALE_BOX.contains(mouseX, mouseY)) { pickedGender = Gender.MALE; createHint = ""; }
+            else if (FEMALE_BOX.contains(mouseX, mouseY)) { pickedGender = Gender.FEMALE; createHint = ""; }
+            else if (CONFIRM_BOX.contains(mouseX, mouseY)) confirmCreate();
         }
     }
 
@@ -382,6 +436,7 @@ public class MenuScreen {
         switch (phase) {
             case MAIN -> mainMenu(g);
             case SETTINGS -> settingsMenu(g);
+            case CREATE -> createMenu(g);
             case LOADING -> loading(g);
         }
         g.setTransform(base);
@@ -468,6 +523,63 @@ public class MenuScreen {
             g.setComposite(oldC);
         }
         g.setTransform(oldT);
+    }
+
+    /**
+     * UI GOES HERE: placeholder "name and gender" screen. Replace everything inside this method with your
+     * Figma design. Keep using nameBuf (typed name), pickedGender (null/MALE/FEMALE) and createHint.
+     */
+    private void createMenu(Graphics2D g) {
+        g.setColor(new Color(4, 6, 12, 225));
+        g.fillRoundRect(340, 180, 600, 370, 24, 24);
+        g.setColor(new Color(210, 220, 235, 180));
+        g.setStroke(new BasicStroke(2));
+        g.drawRoundRect(340, 180, 600, 370, 24, 24);
+
+        g.setFont(big);
+        g.setColor(Color.WHITE);
+        drawCentered(g, "WHO ARE YOU?", 640, 238);
+
+        g.setFont(small);
+        g.setColor(new Color(190, 195, 205));
+        g.drawString("Name", NAME_BOX.x, NAME_BOX.y - 10);
+        g.drawString("Gender", MALE_BOX.x, MALE_BOX.y - 8);
+
+        // name box + blinking caret
+        g.setColor(new Color(20, 24, 34));
+        g.fillRoundRect(NAME_BOX.x, NAME_BOX.y, NAME_BOX.width, NAME_BOX.height, 12, 12);
+        g.setColor(new Color(150, 160, 180));
+        g.drawRoundRect(NAME_BOX.x, NAME_BOX.y, NAME_BOX.width, NAME_BOX.height, 12, 12);
+        g.setFont(big);
+        g.setColor(Color.WHITE);
+        String shown = nameBuf.toString() + (((int) (t * 2)) % 2 == 0 ? "|" : "");
+        g.drawString(shown, NAME_BOX.x + 16, NAME_BOX.y + 38);
+
+        genderButton(g, MALE_BOX, "MALE", pickedGender == Gender.MALE);
+        genderButton(g, FEMALE_BOX, "FEMALE", pickedGender == Gender.FEMALE);
+        genderButton(g, CONFIRM_BOX, "CONFIRM", false);
+
+        g.setFont(small);
+        g.setColor(new Color(255, 110, 100));
+        drawCentered(g, createHint, 640, 535 - 8);
+        g.setColor(new Color(150, 155, 165));
+        drawCentered(g, "Type your name  -  Left/Right = gender  -  Enter = confirm  -  Esc = back", 640, 560);
+    }
+
+    private void genderButton(Graphics2D g, Rectangle r, String label, boolean selected) {
+        boolean hover = r.contains(mouseX, mouseY);
+        g.setColor(selected ? new Color(120, 30, 28) : new Color(20, 24, 34));
+        g.fillRoundRect(r.x, r.y, r.width, r.height, 12, 12);
+        g.setColor(selected ? new Color(255, 90, 70) : hover ? new Color(255, 200, 190) : new Color(150, 160, 180));
+        g.setStroke(new BasicStroke(selected || hover ? 3 : 2));
+        g.drawRoundRect(r.x, r.y, r.width, r.height, 12, 12);
+        g.setFont(small.deriveFont(Font.BOLD, 18f));
+        g.setColor(Color.WHITE);
+        drawCentered(g, label, r.x + r.width / 2, r.y + r.height / 2 + 6);
+    }
+
+    private void drawCentered(Graphics2D g, String text, int cx, int baseline) {
+        g.drawString(text, cx - g.getFontMetrics().stringWidth(text) / 2, baseline);
     }
 
     private void settingsMenu(Graphics2D g) {
