@@ -280,7 +280,7 @@ public class Renderer {
             double glow = o.glow(), alpha = o.alpha();
             for (int sx = Math.max(0, x0); sx <= Math.min(W - 1, x1); sx++) {
                 if (depth >= zbuf[sx]) continue;
-                int u = (int) ((sx - x0) / Math.max(1, x1 - x0) * sp.w);
+                int u = (int) ((sx - x0) / (double) Math.max(1, x1 - x0) * sp.w);
                 if (u < 0 || u >= sp.w) continue;
                 if (o instanceof Door d) {
                     double swing = d.getSwing();
